@@ -1,0 +1,16 @@
+# Vercel 로컬 프로젝트 연결 정보(계정/프로젝트 ID) — 올리지 않는다
+.vercel/
+
+# 발표 자료는 별도 관리 (팀명 등 입력 전 초안이라 공개 저장소에는 올리지 않음)
+presentation/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 편집기·OS
+.DS_Store
+Thumbs.db
+*.bak

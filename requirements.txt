@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+python-multipart
+faster-whisper
+# faster-whisper 1.2.x calls av.open(metadata_errors=...), which was removed in av 19 (every /stt request would fail).
+# Keep this file ASCII-only: pip reads it with the system locale (cp949 on Korean Windows).
+av<19

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>모여라 AI - 모두가 편한 약속 장소 큐레이터</title>
+  <meta name="description" content="친구들의 출발지와 약속 조건을 분석해 모두가 편한 약속 장소와 주변 추천 스팟을 알려 드려요." />
+  <!-- Leaflet (OpenStreetMap) - API 키 불필요 -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-tab="setup">
+  <header class="header header--compact">
+    <div class="header__inner">
+      <div class="logo" aria-hidden="true">📍</div>
+      <div>
+        <h1 class="header__title">모여라 AI</h1>
+        <p class="header__sub">모두가 편한 약속 장소 큐레이터</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- 단계 탭 (데스크톱에서는 왼쪽 패널 폭에 맞춰 배치) -->
+  <div class="tabs-wrap">
+    <div class="tabs-wrap__inner">
+      <div class="tabs" role="tablist" aria-label="화면 단계">
+        <button type="button" role="tab" id="tab-setup" class="tab" aria-selected="true" aria-controls="panel-setup">
+          <span class="tab__no">1</span> 약속 설정
+        </button>
+        <button type="button" role="tab" id="tab-result" class="tab" aria-selected="false" aria-controls="panel-result" tabindex="-1">
+          <span class="tab__no">2</span> AI 결과 분석
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <main class="app" id="app">
+    <!-- ───── 왼쪽: 약속 설정 / 결과 목록 ───── -->
+    <div class="pane pane--left" id="pane-left">
+
+      <!-- 탭 1: 약속 설정 -->
+      <div id="panel-setup" class="panel panel--enter" role="tabpanel" aria-labelledby="tab-setup">
+        <section class="card templates" aria-label="빠른 선택">
+          <div class="tpl-row">
+            <span class="tpl-row__label">⚡ 빠른 선택</span>
+            <div id="templates" class="tpl-grid" role="group" aria-label="모임 성격 퀵 템플릿"></div>
+          </div>
+        </section>
+
+        <form id="meetup-form" class="layout" novalidate>
+          <!-- 출발지 -->
+          <section class="card" aria-labelledby="origins-title">
+            <div class="card__head">
+              <h2 id="origins-title">📍 친구들 출발지</h2>
+              <button type="button" id="add-origin" class="btn btn--ghost">+ 친구 추가</button>
+            </div>
+            <p class="hint">전국 어디든 입력해요 · 최소 2명, 최대 8명 · <b>내 위치</b>를 누르면 GPS로 자동 입력돼요.</p>
+            <div id="origin-list" class="origin-list">
+              <div class="origin-row">
+                <b class="badge">A</b>
+                <input type="text" name="origin" placeholder="예: 강남역, 역삼동, 대전역" aria-label="출발 위치 A" autocomplete="off" />
+                <button type="button" class="origin-gps" aria-label="출발지 A를 내 위치로 입력" title="현재 GPS 위치로 입력">📍<span>내 위치</span></button>
+                <button type="button" class="origin-remove" aria-label="출발지 A 삭제" title="삭제">✕</button>
+              </div>
+              <div class="origin-row">
+                <b class="badge">B</b>
+                <input type="text" name="origin" placeholder="예: 홍대 9번출구, 판교역" aria-label="출발 위치 B" autocomplete="off" />
+                <button type="button" class="origin-gps" aria-label="출발지 B를 내 위치로 입력" title="현재 GPS 위치로 입력">📍<span>내 위치</span></button>
+                <button type="button" class="origin-remove" aria-label="출발지 B 삭제" title="삭제">✕</button>
+              </div>
+            </div>
+            <p id="geo-status" class="geo-status" role="status" aria-live="polite" hidden></p>
+          </section>
+
+          <!-- 조건: 6개 카테고리 필터 칩 -->
+          <section class="card" aria-labelledby="cond-title">
+            <div class="card__head">
+              <h2 id="cond-title">🎛 약속 조건</h2>
+              <div class="cond-tools">
+                <span id="chip-count" class="cond-tools__count">선택 0개</span>
+                <button type="button" id="chip-reset" class="btn btn--ghost btn--xs">초기화</button>
+              </div>
+            </div>
+            <!-- 음성으로 조건 말하기 -->
+            <div class="voice" id="voice">
+              <div class="voice__bar">
+                <button type="button" id="voice-btn" class="voice__btn" aria-pressed="false">
+                  <span class="voice__mic" aria-hidden="true">🎤</span><span id="voice-btn-text">음성으로 조건 말하기</span>
+                </button>
+                <span class="voice__privacy" title="이 앱은 음성을 저장하지 않아요. 인식이 끝나면 즉시 폐기돼요.">🔒 음성 데이터는 인식 후 즉시 폐기됩니다</span>
+              </div>
+              <p class="voice__fine">※ 이 앱은 음성을 저장하지 않아요. 브라우저 기본 음성인식은 브라우저 제공사의 서버를 거칠 수 있어요.
+                <span id="voice-mode" class="voice__mode"></span></p>
+
+              <div id="voice-listening" class="voice__listening" role="status" aria-live="polite" hidden>
+                <span class="voice__wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+                <span id="voice-interim" class="voice__interim">듣고 있어요… 말씀해 주세요</span>
+                <button type="button" id="voice-stop" class="btn btn--ghost btn--xs">■ 완료</button>
+              </div>
+
+              <div id="voice-confirm" class="voice__confirm" hidden>
+                <label for="voice-text" class="voice__label">음성 인식 결과:</label>
+                <textarea id="voice-text" rows="2" maxlength="200" placeholder="예: 강남 근처 조용하고 주차되는 스터디카페"></textarea>
+                <p id="voice-note" class="voice__note" role="status" aria-live="polite"></p>
+                <div class="voice__actions">
+                  <button type="button" id="voice-apply" class="btn btn--ghost btn--xs voice__apply">✓ 이 내용으로 조건 반영</button>
+                  <button type="button" id="voice-retry" class="btn btn--ghost btn--xs">🎤 다시 말하기</button>
+                  <button type="button" id="voice-cancel" class="btn btn--ghost btn--xs">닫기</button>
+                </div>
+              </div>
+
+              <div id="intent-summary" class="intent" role="status" aria-live="polite" hidden></div>
+            </div>
+
+            <div class="chips" id="chips" role="group" aria-label="조건 필터 (여러 개 선택 가능)"></div>
+            <textarea id="conditions" name="conditions" rows="2" maxlength="500"
+              placeholder="직접 입력도 가능해요 (예: 콘센트 많은 곳, 22시 이후까지 영업)"></textarea>
+            <div class="counter"><span id="char-count">0</span> / 500</div>
+          </section>
+
+          <!-- 예산 (미니 조절창) -->
+          <section class="card budget-mini" aria-labelledby="budget-title">
+            <div class="budget-mini__row">
+              <h2 id="budget-title">💰 인당 예산</h2>
+              <strong class="budget-value" id="budget-label">3만 원 이하</strong>
+              <input type="range" id="budget" name="budget" min="10000" max="100000" step="5000" value="30000"
+                aria-labelledby="budget-title" />
+              <div class="chips" id="budget-presets">
+                <button type="button" class="chip chip--sm" data-value="20000">2만</button>
+                <button type="button" class="chip chip--sm" data-value="30000">3만</button>
+                <button type="button" class="chip chip--sm" data-value="50000">5만</button>
+                <button type="button" class="chip chip--sm" data-value="100000">무제한</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- AI 연결 설정 -->
+          <details class="card settings" id="api-settings">
+            <summary>🔑 Claude API 연결 설정 <span id="mode-badge" class="mode-badge">키 없음 · 로컬 데모 분석</span></summary>
+            <p class="hint">
+              <b>키 없이도 모두 동작해요.</b> 장소 검색은 OpenStreetMap Nominatim, 주변 스팟은 OSM 장소 검색, 이동시간은 거리 기반 추정으로 계산해요.
+              Claude API 키를 입력하면 AI가 이동시간·추천 이유·유명 스팟(대표 메뉴·특징 포함)까지 더 풍부하게 분석해요.
+              키는 이 브라우저 탭(sessionStorage)에만 저장되고 탭을 닫으면 사라져요.
+            </p>
+            <label class="field">
+              <span class="field__label">Anthropic API Key</span>
+              <input type="password" id="api-key" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+            </label>
+            <p class="hint hint--warn">⚠ 브라우저에서 직접 호출하면 키가 노출돼요. 개인 테스트용으로만 쓰고, 배포할 때는 서버 프록시를 거치세요.</p>
+          </details>
+
+          <div class="submit-area">
+            <p id="form-error" class="error" role="alert" hidden></p>
+            <button type="submit" id="analyze-btn" class="btn btn--primary">🔍 최적 장소 AI 분석하기</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 탭 2: AI 결과 분석 -->
+      <div id="panel-result" class="panel" role="tabpanel" aria-labelledby="tab-result" hidden>
+        <!-- 아직 결과가 없을 때 -->
+        <section id="result-empty" class="card empty">
+          <div class="empty__icon" aria-hidden="true">🧭</div>
+          <h2>아직 분석 결과가 없어요</h2>
+          <p class="hint">출발지와 조건을 입력하고 분석을 시작하면 이곳에 결과가, 오른쪽 지도에 위치가 나타나요.</p>
+          <button type="button" id="go-setup" class="btn btn--ghost">← 약속 설정으로 가기</button>
+        </section>
+
+        <!-- 로딩 -->
+        <section id="loading" class="card loading" role="status" aria-live="polite" hidden>
+          <div class="spinner" aria-hidden="true"></div>
+          <h2 class="loading__title">AI가 최적 장소를 분석하고 있어요</h2>
+          <ol id="loading-steps" class="loading__steps">
+            <li>출발지를 지도 좌표로 변환</li>
+            <li>후보 중간 지점별 이동시간 계산</li>
+            <li>공평성 점수 비교</li>
+            <li>추천 이유와 주변 추천 스팟 정리</li>
+          </ol>
+        </section>
+
+        <!-- 결과 -->
+        <section id="result" class="result" aria-live="polite" hidden>
+          <div class="result__head">
+            <h2>분석 결과</h2>
+            <span id="result-source" class="mode-badge"></span>
+            <button type="button" id="back-to-setup" class="btn btn--ghost btn--xs result__back">✏️ 설정 수정</button>
+          </div>
+          <p id="result-notice" class="notice" hidden></p>
+
+          <!-- 최적 요약 배너 (1~2줄) -->
+          <section id="summary" class="summary" aria-label="최적 요약"></section>
+
+          <div id="top3" class="top3"></div>
+
+          <!-- 주변 추천 스팟 -->
+          <section class="card block" aria-labelledby="places-title">
+            <div class="places__head">
+              <h3 id="places-title" class="section-title">📍 <span id="places-station">1위 지역</span> 주변 추천 스팟 <span id="places-count"></span></h3>
+              <span id="places-source" class="mode-badge"></span>
+            </div>
+
+            <div id="spot-controls" class="spot-controls" hidden>
+              <div id="spot-sort" class="seg" role="group" aria-label="정렬">
+                <button type="button" class="seg__btn" data-sort="dist" aria-pressed="false">📏 거리순</button>
+                <button type="button" class="seg__btn" data-sort="pop" aria-pressed="true" title="리뷰 데이터가 없어 정보가 풍부한 순(OSM)·AI가 꼽은 유명도 순으로 인기를 추정해요">⭐ 리뷰·인기순</button>
+              </div>
+              <div id="spot-filter" class="seg" role="group" aria-label="종류 필터">
+                <button type="button" class="seg__btn" data-filter="all" data-label="전체" aria-pressed="true">전체</button>
+                <button type="button" class="seg__btn" data-filter="카페" data-label="☕ 카페" aria-pressed="false">☕ 카페</button>
+                <button type="button" class="seg__btn" data-filter="공원" data-label="🌳 공원" aria-pressed="false">🌳 공원</button>
+                <button type="button" class="seg__btn" data-filter="식당" data-label="🍽 식당" aria-pressed="false">🍽 식당</button>
+                <button type="button" class="seg__btn" data-filter="etc" data-label="📚 스터디·문화" aria-pressed="false">📚 스터디·문화</button>
+              </div>
+            </div>
+
+            <div id="places" class="places"></div>
+            <p id="places-note" class="hint places__note"></p>
+          </section>
+
+          <!-- 추천 카테고리 · 테마 -->
+          <section class="card block" aria-labelledby="cat-title">
+            <h3 id="cat-title" class="section-title">🧭 추천 카테고리 · 테마</h3>
+            <p id="cat-sub" class="hint"></p>
+            <div id="categories" class="categories"></div>
+          </section>
+
+          <!-- 공유 -->
+          <section class="card block share" aria-labelledby="share-title">
+            <h3 id="share-title" class="section-title">📤 약속 장소 공유하기</h3>
+            <pre id="share-preview" class="share__preview" aria-label="카카오톡 공유 텍스트 미리보기"></pre>
+            <div class="share__actions">
+              <button type="button" id="copy-link" class="btn btn--share">🔗 약속 장소 결과 링크 복사</button>
+              <button type="button" id="copy-kakao" class="btn btn--share btn--kakao">💬 카카오톡 공유 텍스트 복사</button>
+            </div>
+            <p id="share-status" class="share__status" role="status" aria-live="polite"></p>
+          </section>
+        </section>
+      </div>
+
+      <footer class="footer">© 2026 모여라 AI</footer>
+    </div>
+
+    <!-- ───── 오른쪽: 고정 지도 (데스크톱) / 결과 탭 상단 (모바일) ───── -->
+    <aside class="pane pane--right" id="pane-right" aria-label="지도">
+      <section class="card map-card" aria-labelledby="map-title">
+        <div class="map-card__head">
+          <h3 id="map-title">🗺 한눈에 보는 지도</h3>
+          <div class="map-legend" aria-hidden="true">
+            <span><i class="lg lg--origin"></i>출발지</span>
+            <span><i class="lg lg--r1"></i>1위</span>
+            <span><i class="lg lg--r2"></i>2위</span>
+            <span><i class="lg lg--r3"></i>3위</span>
+          </div>
+        </div>
+        <div class="map-wrap">
+          <div id="map-container" role="region" aria-label="출발지와 추천 장소 지도"></div>
+          <div id="map-empty" class="map-empty">📍 분석하면 출발지와 추천 장소가 여기에 표시돼요</div>
+        </div>
+        <p id="map-fallback" class="hint map-fallback" hidden></p>
+      </section>
+    </aside>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

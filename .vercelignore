@@ -1,0 +1,9 @@
+# Vercel 에는 프론트엔드 정적 파일(index.html, styles.css, app.js)만 올린다.
+# 아래는 배포 대상이 아니다(공개 URL 로 노출될 필요가 없다).
+presentation/
+server.py
+requirements.txt
+__pycache__/
+*.pptx
+*.bak
+.vercel
